@@ -64,12 +64,14 @@ class ModernGUI(tk.Tk):
         self.location_var = tk.StringVar()
         self.yellow_pages_keyword_search_var = tk.StringVar()
         self.google_maps_keyword_search_var = tk.StringVar()
+        self.healthgrades_keyword_search_var = tk.StringVar()
         self.limit_var = tk.IntVar(value=50)
-        self.radius_var = tk.StringVar(value="10")
-        self.status_var = tk.StringVar(value="")  # inline status text (no popups)
+        self.radius_var = tk.StringVar(value="5")
+        self.status_var = tk.StringVar(value="") 
         self.providers = {
             "YellowPages": tk.BooleanVar(value=False),
             "GoogleMaps": tk.BooleanVar(value=False),
+            "HealthGrades": tk.BooleanVar(value=False)
         }
         self.yellow_pages_facilities = {
             "Hospital": tk.BooleanVar(value=False),
@@ -78,6 +80,12 @@ class ModernGUI(tk.Tk):
             "Diagnostic": tk.BooleanVar(value=False)
         }
         self.google_maps_facilities = {
+            "Hospital": tk.BooleanVar(value=False),
+            "Pharmacy": tk.BooleanVar(value=False),
+            "Clinic": tk.BooleanVar(value=False),
+            "Diagnostic": tk.BooleanVar(value=False)
+        }
+        self.healthgrades_facilities = {
             "Hospital": tk.BooleanVar(value=False),
             "Pharmacy": tk.BooleanVar(value=False),
             "Clinic": tk.BooleanVar(value=False),
@@ -93,6 +101,8 @@ class ModernGUI(tk.Tk):
             "InpatientRehabilitation": tk.BooleanVar(value=False),
             "LongTermCare" : tk.BooleanVar(value=False),
         }
+        
+        self.selected_healthgrades = []
         
         # Animation variables
         self.animation_step = 0
@@ -475,6 +485,85 @@ class ModernGUI(tk.Tk):
                 highlightthickness=0,
                 font=('SF Pro Text', 10)
             ).pack(side='left', padx=10, pady=2)
+            
+        # --- Health Grades section (tight) ---
+        healthgrades_frame = tk.Frame(content_frame, bg=self.colors['bg'])
+        healthgrades_frame.pack(fill='x', expand=False, padx=0, pady=(0, 2))   # was expand=True / bigger pady
+
+        healthgrades_search_card = tk.Frame(healthgrades_frame, bg=self.colors['card_bg'], pady=4, padx=12)
+        healthgrades_search_card.pack(fill='x', expand=False, pady=(0, 2))  
+        self._add_shadow_effect(healthgrades_search_card)
+
+        ### HEALTHGRADES HEADER ###
+        tk.Label(healthgrades_search_card, text="Health Grades", bg=self.colors['card_bg'], fg=self.colors['text'],
+                font=('SF Pro Text', 14, 'bold')).pack(anchor='center', pady=(0, 2))
+
+        ### HEALTHGRADES SUBHEADING
+        tk.Label(healthgrades_search_card, text="Search keyword/s", bg=self.colors['card_bg'], fg=self.colors['text'],
+        font=('SF Pro Text', 10, 'bold')).pack(anchor='w', pady=(0, 2))
+
+        hg_row = tk.Frame(healthgrades_search_card, bg='#2A3441')
+        hg_row.pack(fill='x', pady=(0, 2))
+        hg_keyword_entry = tk.Entry(hg_row, textvariable=self.healthgrades_keyword_search_var,
+                                bg='#2A3441', fg=self.colors['text'],
+                                borderwidth=0, relief='flat',
+                                font=('SF Pro Text', 11),
+                                insertbackground=self.colors['accent'])
+        hg_keyword_entry.pack(side='left', fill='x', expand=True, padx=10, pady=4)
+
+        tk.Label(healthgrades_search_card, text="separate each keyword with a comma (,)",
+                bg=self.colors['card_bg'], fg=self.colors['text_secondary'],
+                font=('SF Pro Text', 9)).pack(anchor='w', pady=(0, 2))
+
+        ### CHECKBOXES
+        # Initialize the keyword search var with empty value initially
+        if not hasattr(self, "healthgrades_keyword_search_var"):
+            self.healthgrades_keyword_search_var = tk.StringVar(value="")
+
+        # Create a separate variable for radio button selection
+        if not hasattr(self, "healthgrades_radio_var"):
+            self.healthgrades_radio_var = tk.StringVar(value="NONE_SELECTED")  # Use a value that doesn't match any radio
+            
+        if "HealthGrades" not in self.providers:
+            self.providers["HealthGrades"] = tk.BooleanVar(value=False)
+            
+        def _sync_hg_provider(*_):
+            """Enable Health Grades source whenever there's a non-empty keyword."""
+            kw = self.healthgrades_keyword_search_var.get().strip()
+            self.providers["HealthGrades"].set(bool(kw))
+
+        # Update on any change to the keyword var
+        self.healthgrades_keyword_search_var.trace_add("write", _sync_hg_provider)
+
+        def on_radio_select():
+            """Update the keyword search field when radio button is selected"""
+            selected = self.healthgrades_radio_var.get()
+            if selected and selected != "NONE_SELECTED":
+                self.healthgrades_keyword_search_var.set(selected)
+            _sync_hg_provider()
+
+        hg_rb_row = tk.Frame(healthgrades_search_card, bg=self.colors['card_bg'])
+        hg_rb_row.pack(fill='x', pady=(2, 2))
+
+        # a centered strip that holds the radios
+        rb_strip = tk.Frame(hg_rb_row, bg=self.colors['card_bg'])
+        rb_strip.pack(anchor='w')
+        
+        _sync_hg_provider()
+
+        hg_cats_grid = tk.Frame(healthgrades_search_card, bg=self.colors['card_bg'])
+        hg_cats_grid.pack(fill='x')
+
+        cols = 4
+        r = c = 0
+        for name, var in self.healthgrades_facilities.items():
+            cell = tk.Frame(hg_cats_grid, bg=self.colors['card_bg'])
+            cell.grid(row=r, column=c, sticky='w', padx=(0, 14), pady=2)
+            self._create_modern_checkbox(cell, name, var)
+            c += 1
+            if c >= cols:
+                c = 0
+                r += 1
 
         # === Categories (Medicare) — tighter gaps ===
         cat_card = tk.Frame(content_frame, bg=self.colors['card_bg'], pady=4, padx=12)
@@ -609,22 +698,14 @@ class ModernGUI(tk.Tk):
         button.bind('<Enter>', on_hover_enter)
         button.bind('<Leave>', on_hover_leave)
     
-    def _show_settings(self):
-        """Placeholder for settings functionality"""
-        messagebox.showinfo("Settings", "Settings panel coming soon!")
-    
-    def _show_history(self):
-        """Placeholder for history functionality"""
-        messagebox.showinfo("History", "Search history coming soon!")
-    
     def _create_modern_checkbox(self, parent, text, variable):
         """Create a modern custom checkbox"""
         frame = tk.Frame(parent, bg=self.colors['card_bg'])
         frame.pack(fill='x')
         
-        # Custom checkbox canvas
-        cb_canvas = tk.Canvas(frame, width=20, height=20, bg=self.colors['card_bg'],
-                             highlightthickness=0, cursor='hand2')
+        # Custom checkbox canvas - made smaller
+        cb_canvas = tk.Canvas(frame, width=16, height=16, bg=self.colors['card_bg'],
+                            highlightthickness=0, cursor='hand2')
         cb_canvas.pack(side='left', padx=(0, 8))
         
         # Label
@@ -640,15 +721,15 @@ class ModernGUI(tk.Tk):
         def update_checkbox():
             cb_canvas.delete('all')
             if variable.get():
-                # Checked state - filled circle with checkmark
-                cb_canvas.create_oval(2, 2, 18, 18, fill=self.colors['accent'], 
-                                    outline=self.colors['accent'], width=2)
-                cb_canvas.create_line(6, 10, 9, 13, fill='white', width=2)
-                cb_canvas.create_line(9, 13, 14, 7, fill='white', width=2)
+                # Checked state - filled circle with checkmark (adjusted for smaller size)
+                cb_canvas.create_oval(1, 1, 15, 15, fill=self.colors['accent'], 
+                                    outline=self.colors['accent'], width=1)
+                cb_canvas.create_line(4, 8, 7, 11, fill='white', width=2)
+                cb_canvas.create_line(7, 11, 12, 5, fill='white', width=2)
             else:
-                # Unchecked state - circle outline
-                cb_canvas.create_oval(2, 2, 18, 18, fill='', 
-                                    outline=self.colors['text_secondary'], width=2)
+                # Unchecked state - circle outline (adjusted for smaller size)
+                cb_canvas.create_oval(1, 1, 15, 15, fill='', 
+                                    outline=self.colors['text_secondary'], width=1)
         
         # Bind clicks
         cb_canvas.bind('<Button-1>', toggle_checkbox)
@@ -850,6 +931,7 @@ class ModernGUI(tk.Tk):
         location = self.location_var.get().strip()
         yellow_pages_keyword_search = self.yellow_pages_keyword_search_var.get().strip()
         google_maps_keyword_search = self.google_maps_keyword_search_var.get().strip()
+        healthgrades_keyword_search = self.healthgrades_keyword_search_var.get().strip()
         try:
             limit = int(self.limit_var.get())
         except ValueError:
@@ -904,7 +986,7 @@ class ModernGUI(tk.Tk):
         # Inline status + progress (no success popup)
         self.status_var.set(
             f"Searching at location {location} • Limit {limit} • Radius {radius} mi • "
-            f"Sources: {', '.join([k for k,v in sources.items() if v] + (['Medicare'] if any(self.selected_categories) else ''))}"
+            f"Sources: {', '.join([k for k,v in sources.items() if v] + (['HealthGrades'] if any(v.get() for v in self.healthgrades_facilities.values()) else []) + (['Medicare'] if any(self.selected_categories) else []))}"
         )
         self.show_progress()
 
@@ -913,19 +995,21 @@ class ModernGUI(tk.Tk):
         print(f"Location: {location}")
         print(f"Yellow Pages Keyword Search: {yellow_pages_keyword_search}")
         print(f"Google Maps Keyword Search: {google_maps_keyword_search}")
+        print(f"Health Grades Keyword Search: {healthgrades_keyword_search}")
         print(f"Limit: {limit}")
         print(f"Radius: {radius} miles")
         print(f"Sources: {', '.join([k for k,v in sources.items() if v])}")
+        print(f"HealthGrades Categories: {', '.join([k for k,v in self.healthgrades_facilities.items() if v.get()])}")
         print(f"Medicare Categories: {', '.join([k for k,v in medicare_categories.items() if v])}")
         # Kick off scraping in a background thread
         
-        active_medicare_categories = {k: v for k, v in medicare_categories.items() if v is True}
-        t = threading.Thread(
-            target=self._run_pipeline_bg,
-            args=(location, yellow_pages_keyword_search, google_maps_keyword_search, limit, radius, sources, active_medicare_categories),
-            daemon=True
-        )
-        t.start()
+        # active_medicare_categories = {k: v for k, v in medicare_categories.items() if v is True}
+        # t = threading.Thread(
+        #     target=self._run_pipeline_bg,
+        #     args=(location, yellow_pages_keyword_search, google_maps_keyword_search, limit, radius, sources, active_medicare_categories),
+        #     daemon=True
+        # )
+        # t.start()
 
     def _run_pipeline_bg(self, location, yellow_pages_keyword_search, google_maps_keyword_search, limit, radius, sources, medicare_categories):
         """Background thread: run pipeline and update UI when done."""

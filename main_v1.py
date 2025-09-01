@@ -12,6 +12,8 @@ from medicare_v1 import scrape_medicare as scrape_medicare_v1
 from yellowpages_v3 import scrape_yellowpages
 # from gmaps import scrape_google_maps
 from gmaps_v1 import scrape_google_maps
+from healthgrades import scrape_healthgrades
+
 # from browser import driver
 from config import _outfile_from_location, results_dir_for_today
 
@@ -73,43 +75,40 @@ def run(
     limit: int,
     radius_miles: int,
     sources: Dict[str, bool],
+    hg_categories: Dict[str, bool],
     medicare_categories: Dict[str, bool],
 ) -> Dict:
     """
     Execute selected scrapers and write Excel.
     Returns a summary dict for the UI.
     """
-    cols = ["Name", "Specialty", "Contact number", "Address", "Distance", "Source URL"]
-    cols_medicare = ["Name", "Mileage", "Address", "City", "State", "Zip", "Phone Number", "Specialty", "Full Address"]
+    cols = ["Name", "Mileage", "Address", "City", "State", "Zip", "Phone Number", "Specialty", "Full Address"]
     rows_medicare: List = []
     rows_yp: List = []
     rows_gmaps: List = []
+    rows_hg: List = []
     
     output_name = _outfile_from_location(location)         # from config.py
     results_dir = results_dir_for_today()                  # from config.py
     output_file = os.path.join(results_dir, output_name)
     try:
         if any(medicare_categories.values()):
-            # medicare_fn = scrape_medicare_v1
-            # rows_medicare = _safe_call_scraper(
-            #     medicare_fn, location=location, limit=limit, radius_miles=radius_miles
-            # )
             rows_medicare = scrape_medicare_v1(location, medicare_categories, limit, radius_miles)
+            
         if sources.get("YellowPages"):
-            # rows_yp = _safe_call_scraper(
-            #     scrape_yellowpages, location=location, limit=limit, radius_miles=radius_miles
-            # )
             rows_yp = scrape_yellowpages(location, yp_keyword, limit, radius_miles)
+            
         if sources.get("GoogleMaps"):
-            # rows_gmaps = _safe_call_scraper(
-            #     scrape_google_maps, location=location, limit=limit, radius_miles=radius_miles
-            # )
             rows_gmaps = scrape_google_maps(location, gmaps_keyword, limit, radius_miles)
+            
+        if sources.get("HealthGrades"):
+            rows_hg = scrape_healthgrades(location, hg_categories, limit, radius_miles)
 
         # Build DataFrames
-        df_medicare = pd.DataFrame(rows_medicare, columns=cols_medicare) if rows_medicare else pd.DataFrame(columns=cols_medicare)
-        df_yp = pd.DataFrame(rows_yp, columns=cols_medicare) if rows_yp else pd.DataFrame(columns=cols_medicare)
-        df_gmaps = pd.DataFrame(rows_gmaps, columns=cols_medicare) if rows_gmaps else pd.DataFrame(columns=cols_medicare)
+        df_medicare = pd.DataFrame(rows_medicare, columns=cols) if rows_medicare else pd.DataFrame(columns=cols)
+        df_yp = pd.DataFrame(rows_yp, columns=cols) if rows_yp else pd.DataFrame(columns=cols)
+        df_gmaps = pd.DataFrame(rows_gmaps, columns=cols) if rows_gmaps else pd.DataFrame(columns=cols)
+        df_hg = pd.DataFrame(rows_hg, columns=cols) if rows_hg else pd.DataFrame(columns=cols)
 
         # Remove old file if present
         if os.path.exists(output_file):
@@ -128,6 +127,10 @@ def run(
             if not df_gmaps.empty:
                 df_gmaps.to_excel(xw, sheet_name="GoogleMaps", index=False)
                 format_worksheet(xw.sheets["GoogleMaps"], len(df_gmaps.columns), len(df_gmaps))
+                
+            if not df_hg.empty:
+                df_hg.to_excel(xw, sheet_name="HealthGrades", index=False)
+                format_worksheet(xw.sheets["HealthGrades"], len(df_hg.columns), len(df_hg))
 
         summary = {
             "outfile": output_file,
@@ -135,6 +138,7 @@ def run(
                 "Medicare": len(df_medicare),
                 "YellowPages": len(df_yp),
                 "GoogleMaps": len(df_gmaps),
+                "HealthGrades": len(df_hg)
             },
         }
         print(f"\nSaved to: {output_file}")
@@ -148,6 +152,9 @@ def run(
         import traceback
         traceback.print_exc()
         return None
+    
+    
+    
     # finally:
     #     # Ensure we always close the shared browser
     #     try:

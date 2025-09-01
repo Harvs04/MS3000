@@ -944,6 +944,7 @@ class ModernGUI(tk.Tk):
         sources = {
             "YellowPages": self.providers["YellowPages"].get(),
             "GoogleMaps": self.providers["GoogleMaps"].get(),
+            "HealthGrades": self.providers["HealthGrades"].get()
         }
         
         healthgrades_keywords = {
@@ -969,22 +970,17 @@ class ModernGUI(tk.Tk):
             self._show_modern_error("Please enter a search location")
             self.is_searching = False
             return
-        # if not keyword_search and any(sources.values()):
-        #     self._show_modern_error("Please enter a keyword to search")
-        #     self.is_searching = False
-        #     return
+       
         if limit < 1:
             self._show_modern_error("Result limit must be at least 1")
             self.is_searching = False
             return
+        
         if radius not in range(5, 255, 5):
             self._show_modern_error("Please select a valid search radius")
             self.is_searching = False
             return
-        # if not any(sources.values()) and not any(medicare_categories.values()):
-        #     self._show_modern_error("Choose at least one data source or Medicare category")
-        #     self.is_searching = False
-        #     return
+        
         if not any(medicare_categories.values()) and not yellow_pages_keyword_search and not google_maps_keyword_search and not healthgrades_keyword_search and not any(healthgrades_keywords.values()):
             self._show_modern_error("Please enter at least one keyword to search for Yellow Pages, Google Maps, HealthGrades, or Medicare")
             self.is_searching = False
@@ -1010,15 +1006,22 @@ class ModernGUI(tk.Tk):
         print(f"Medicare Categories: {', '.join([k for k,v in medicare_categories.items() if v])}")
         # Kick off scraping in a background thread
         
-        # active_medicare_categories = {k: v for k, v in medicare_categories.items() if v is True}
-        # t = threading.Thread(
-        #     target=self._run_pipeline_bg,
-        #     args=(location, yellow_pages_keyword_search, google_maps_keyword_search, limit, radius, sources, active_medicare_categories),
-        #     daemon=True
-        # )
-        # t.start()
+        active_hg_categories = {k: v for k, v in self.healthgrades_facilities.items() if v.get()}
+        for keyword in healthgrades_keyword_search.split(','):
+            keyword = keyword.strip() 
+            if keyword: 
+                active_hg_categories[keyword] = True
+            
+        print(f"active hg: {active_hg_categories}")
+        active_medicare_categories = {k: v for k, v in medicare_categories.items() if v is True}
+        t = threading.Thread(
+            target=self._run_pipeline_bg,
+            args=(location, yellow_pages_keyword_search, google_maps_keyword_search, limit, radius, sources, active_hg_categories, active_medicare_categories),
+            daemon=True
+        )
+        t.start()
 
-    def _run_pipeline_bg(self, location, yellow_pages_keyword_search, google_maps_keyword_search, limit, radius, sources, medicare_categories):
+    def _run_pipeline_bg(self, location, yellow_pages_keyword_search, google_maps_keyword_search, hg_keywords_string, limit, radius, sources, hg_categories, medicare_categories):
         """Background thread: run pipeline and update UI when done."""
         try:
             summary = main_v1.run(
@@ -1028,6 +1031,7 @@ class ModernGUI(tk.Tk):
                 limit=limit,
                 radius_miles=radius,
                 sources=sources,
+                hg_categories=hg_categories,
                 medicare_categories=medicare_categories
             )
             # Update the UI on the main thread

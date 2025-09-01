@@ -946,6 +946,13 @@ class ModernGUI(tk.Tk):
             "GoogleMaps": self.providers["GoogleMaps"].get(),
         }
         
+        healthgrades_keywords = {
+            "Hospital": self.healthgrades_facilities["Hospital"].get(),
+            "Pharmacy": self.healthgrades_facilities["Pharmacy"].get(),
+            "Clinic": self.healthgrades_facilities["Clinic"].get(),
+            "Diagnostic": self.healthgrades_facilities["Diagnostic"].get(),
+        }
+        
         medicare_categories = {
             "Physician": self.medicare_categories["Physician"].get(),
             "Hospital": self.medicare_categories["Hospital"].get(),
@@ -978,15 +985,15 @@ class ModernGUI(tk.Tk):
         #     self._show_modern_error("Choose at least one data source or Medicare category")
         #     self.is_searching = False
         #     return
-        if not any(medicare_categories.values()) and not yellow_pages_keyword_search and not google_maps_keyword_search:
-            self._show_modern_error("Please enter at least one keyword to search for Yellow Pages, Google Maps, or Medicare")
+        if not any(medicare_categories.values()) and not yellow_pages_keyword_search and not google_maps_keyword_search and not healthgrades_keyword_search and not any(healthgrades_keywords.values()):
+            self._show_modern_error("Please enter at least one keyword to search for Yellow Pages, Google Maps, HealthGrades, or Medicare")
             self.is_searching = False
             return
 
         # Inline status + progress (no success popup)
         self.status_var.set(
             f"Searching at location {location} • Limit {limit} • Radius {radius} mi • "
-            f"Sources: {', '.join([k for k,v in sources.items() if v] + (['HealthGrades'] if any(v.get() for v in self.healthgrades_facilities.values()) else []) + (['Medicare'] if any(self.selected_categories) else []))}"
+            f"Sources: {', '.join([k for k,v in sources.items() if v] + (['HealthGrades'] if any(v.get() for v in self.healthgrades_facilities.values()) else []) + (['Medicare'] if any(medicare_categories.values()) else []))}"
         )
         self.show_progress()
 
@@ -1090,7 +1097,7 @@ class ModernGUI(tk.Tk):
         error_window.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() // 2) - (350 // 2)
         y = self.winfo_y() + (self.winfo_height() // 2) - (150 // 2)
-        error_window.geometry(f'350x150+{x}+{y}')
+        error_window.geometry(f'350x200+{x}+{y}')
         
         # Error content
         tk.Label(error_window, text="⚠️", bg=self.colors['bg'], fg=self.colors['error'],
